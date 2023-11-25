@@ -1,87 +1,94 @@
-const  slugify = require('slugify')
+const slugify = require("slugify");
+const asyncHandler = require("express-async-handler");
 const Product = require("../models/product.model");
+const productValid = require("../validator/product.validate");
+const { findByIdAndUpdate } = require("../models/user.model");
 
-const getAllProduct = async (req, res) => {
-  try {
-    const product = await Product.find();
-    res.json({ success: true, product, message: "Get Product Successfully!!" });
-  } catch (error) {
-    console.log(error);
-    res.json({ success: false, message: "Internal Server Error" });
-  }
-};
+const getProducts = asyncHandler(async (req, res) => {
+  // /coppy req.query
+  const queryObj = { ...req.query };
+  const excludedFields = ["page", "sort", "limit", "fields"];
+  excludedFields.forEach((el) => delete queryObj[el]);
 
-const getProductById = async ({ params }, res) => {
-  try {
-    const productById = await Product.findById(params.id);
-    if (!productById) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Product is not found" });
-    }
-    res.json({
-      success: true,
-      productById,
-      message: "Get Product Successfully!!",
+  let queryString = JSON.stringify(queryObj);
+  queryString = queryString.replace(
+    /\b(gte|gt|lte|lt)\b/g,
+    (match) => `$${match}`
+  );
+  let query = JSON.parse(queryString);
+
+  if (queryObj?.name) query.name = { $regex: queryObj.name, $options: "i" };
+  if(queryObj?.categoryId) query.categoryId = queryObj.categoryId;
+  let queryCommand = Product.find(query);
+
+
+
+  const page = +req.query.page || 1;
+  const limit = +req.query.limit || 10;
+  const skip = (page - 1) * limit;
+
+  queryCommand.skip(skip).limit(limit);
+
+  queryCommand
+    .then(async (response) => {
+      const counts = await Product.find(query).countDocuments();
+
+      res.status(response ? 200 : 400).json({
+        status: response ? "success" : "failed",
+        counts,
+        data: response ? response : "Product not found",
+      });
+    })
+    .catch((err) => {
+      throw new Error(err.message);
     });
-  } catch (error) {
-    console.log(error);
-    res.json({ success: false, message: "Internal Server Error" });
-  }
-};
+});
 
-const createProduct = async ({ body }, res) => {
-  try {
-    const newProduct = new Product({
-      ...body,
-      slug: slugify(body.title, { replacement: "-", lower: true }),
-    });
-    await newProduct.save();
-    res.json({ success: true, message: "Create Product Successfully!!" });
-  } catch (error) {
-    console.log(error);
-    res.json({ success: false, message: "Internal Server Error" });
-  }
-};
-
-const updateProduct = async ({ params, body }, res) => {
-  const product = await Product.findById(params.id);
-
-  if (!product) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Product is not found" });
-  }
-  body
-  const updateProduct = await Product.findOneAndUpdate(params.id, {
-    ...body,
-    slug: slugify(body.title, { replacement: "-", lower: true }),
+const getProductById = asyncHandler(async ({ params }, res) => {
+  const { id } = params;
+  if (!id) throw new Error("Missing inputs");
+  const response = await Product.findById(id, { new: true });
+  res.status(response ? 200 : 400).json({
+    status: response ? "success" : "failed",
+    data: response ? response : "Product not found",
   });
-  if (!updateProduct)
-    return res.status(401).json({
-      success: false,
-      message: "Product not found or user not authorised",
-    });
+});
 
-  res.json({
-    success: true,
-    message: "Update successfully!",
-    product: updateProduct,
+const createProduct = asyncHandler(async ({ body }, res) => {
+  if (!Object.keys(body).length === 0) throw new Error("Missing inputss");
+  if (body && body.name)
+    body.slug = slugify(body.name, { replacement: "-", lower: true });
+  const response = await Product.create(body);
+  res.status(response ? 200 : 400).json({
+    status: response ? "success" : "failed",
+    message: response ? "Create successfully" : "Create failed",
   });
-};
+});
+
+const updateProduct = asyncHandler(async ({ params, body }, res) => {
+  if (!params.id || !(Object.keys(body).length === 0))
+    throw new Error("Missing inputs");
+  if (body && body.name)
+    body.slug = slugify(body.name, { replacement: "-", lower: true });
+  const response = await findByIdAndUpdate(params.id, newData, { new: true });
+  res.status(response ? 200 : 400).json({
+    status: response ? "success" : "failed",
+    message: response ? "Update successfully" : "Update failed",
+  });
+});
 
 const deleteProduct = async ({ params }, res) => {
-  const deleteProduct = await Product.findOneAndDelete(params);
-  if (!deleteProduct) {
-    return res.status(401).json({
-      success: false,
-      message: "Product not found or user not authorised",
-    });
-  }
+  const { id } = params;
+  if (!id) throw new Error("Missing inputs");
+  const response = await Product.findOneAndDelete(id);
+  res.status(response ? 200 : 400).json({
+    status: response ? "success" : "failed",
+    message: response ? "Delete successfully" : "Delete failed",
+  });
 };
 
 module.exports = {
-  getAllProduct,
+  getProducts,
   getProductById,
   createProduct,
   updateProduct,

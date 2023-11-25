@@ -2,15 +2,16 @@ const mongoose = require("mongoose");
 
 const productSchema = mongoose.Schema(
   {
-    title: {
+    name: {
       type: String,
       require: true,
       trim: true,
       default: null,
     },
-    category: {
+    categoryId: {
       require: true,
       type: mongoose.Schema.Types.ObjectId,
+      ref: "category"
     },
     price: {
       type: Number,
@@ -18,7 +19,10 @@ const productSchema = mongoose.Schema(
     },
     image: {
       type: Array,
-      default: [],
+      default: [{
+        url: String,
+        publicId: String
+      }],
     },
     rating: {
       type: Number,
