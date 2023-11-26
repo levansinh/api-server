@@ -8,10 +8,15 @@ const productSchema = mongoose.Schema(
       trim: true,
       default: null,
     },
-    categoryId: {
+    category: {
       require: true,
       type: mongoose.Schema.Types.ObjectId,
-      ref: "category"
+      ref: "Category"
+    },
+    brand: {
+      require: true,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Brand"
     },
     price: {
       type: Number,
@@ -28,6 +33,14 @@ const productSchema = mongoose.Schema(
       type: Number,
       default: 0,
     },
+    quantity: {
+      type: Number,
+      default: 0
+  },
+  sold: {
+      type: Number,
+      default: 0
+  },
     color: {
       type: Array,
       default: [],
@@ -40,6 +53,13 @@ const productSchema = mongoose.Schema(
       type: String,
       default: null,
     },
+    ratings: [
+      {
+          star: { type: Number },
+          postedBy: { type: mongoose.Types.ObjectId, ref: 'User' },
+          comment: { type: String }
+      }
+  ],
     slug: {
       type: String,
       require: true,

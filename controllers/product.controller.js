@@ -18,10 +18,8 @@ const getProducts = asyncHandler(async (req, res) => {
   let query = JSON.parse(queryString);
 
   if (queryObj?.name) query.name = { $regex: queryObj.name, $options: "i" };
-  if(queryObj?.categoryId) query.categoryId = queryObj.categoryId;
+  if (queryObj?.category) query.category = queryObj.category;
   let queryCommand = Product.find(query);
-
-
 
   const page = +req.query.page || 1;
   const limit = +req.query.limit || 10;
@@ -77,7 +75,7 @@ const updateProduct = asyncHandler(async ({ params, body }, res) => {
   });
 });
 
-const deleteProduct = async ({ params }, res) => {
+const deleteProduct = asyncHandler(async ({ params }, res) => {
   const { id } = params;
   if (!id) throw new Error("Missing inputs");
   const response = await Product.findOneAndDelete(id);
@@ -85,7 +83,40 @@ const deleteProduct = async ({ params }, res) => {
     status: response ? "success" : "failed",
     message: response ? "Delete successfully" : "Delete failed",
   });
-};
+});
+
+const ratings = asyncHandler(async (req, res) => {
+  const { _id } = req.user;
+  const { star, comment, pid } = req.body;
+  if (!star || !comment || !pid) throw new Error("Missing inputs");
+  const ratingProduct = await Product.findById(pid);
+  const alreadyRating = ratingProduct?.ratings.find(
+    (el) => el.postedBy.toString() === _id
+  );
+
+  if (alreadyRating) {
+    // update comments
+    await Product.updateOne(
+      { ratings: { $elemMatch: alreadyRating } },
+      {
+        $set: { "ratings.$.star": star, "ratings.$.comment": comment },
+      },
+      { new: true }
+    );
+  } else {
+    // create comment
+
+    await Product.findByIdAndUpdate(
+      pid,
+      {
+        $push: { ratings: { star, comment, postedBy: _id } },
+      },
+      {
+        new: true,
+      }
+    );
+  }
+});
 
 module.exports = {
   getProducts,
@@ -93,4 +124,5 @@ module.exports = {
   createProduct,
   updateProduct,
   deleteProduct,
+  ratings,
 };
